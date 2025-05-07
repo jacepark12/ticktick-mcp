@@ -14,7 +14,11 @@ from .authenticate import main as auth_main
 
 def check_auth_setup() -> bool:
     """Check if authentication is set up properly."""
-    # Check if .env file exists with the required credentials
+    # First check if environment variables are directly set
+    if os.getenv("TICKTICK_ACCESS_TOKEN"):
+        return True
+        
+    # If not, check if .env file exists with the required credentials
     env_path = Path('.env')
     if not env_path.exists():
         return False
@@ -39,8 +43,19 @@ def main():
     run_parser.add_argument(
         "--transport", 
         default="stdio", 
-        choices=["stdio"], 
-        help="Transport type (currently only stdio is supported)"
+        choices=["stdio", "sse"], 
+        help="Transport type (stdio or sse - use sse for Docker environments)"
+    )
+    run_parser.add_argument(
+        "--host",
+        default="0.0.0.0", 
+        help="Host to bind to when using SSE transport (default: 0.0.0.0)"
+    )
+    run_parser.add_argument(
+        "--port",
+        type=int,
+        default=3434, 
+        help="Port to use when using SSE transport (default: 3434)"
     )
     
     # 'auth' command for authentication
@@ -86,12 +101,24 @@ Run 'uv run -m ticktick_mcp.cli auth' to set up authentication later.
         log_level = logging.DEBUG if args.debug else logging.INFO
         logging.basicConfig(
             level=log_level,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[logging.StreamHandler(sys.stdout)]
         )
+        
+        # Set debug level if requested
+        if args.debug:
+            # Configure root logger to debug level
+            logging.getLogger().setLevel(logging.DEBUG)
+            print("Debug logging enabled")
         
         # Start the server
         try:
-            server_main()
+            # Pass transport configuration to the server
+            server_main(
+                transport=args.transport,
+                host=args.host,
+                port=args.port
+            )
         except KeyboardInterrupt:
             print("Server stopped by user", file=sys.stderr)
             sys.exit(0)
