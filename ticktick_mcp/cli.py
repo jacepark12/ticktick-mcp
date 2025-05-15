@@ -8,21 +8,16 @@ import os
 import argparse
 import logging
 from pathlib import Path
+from dotenv import load_dotenv
 
 from .src.server import main as server_main
 from .authenticate import main as auth_main
 
+
 def check_auth_setup() -> bool:
     """Check if authentication is set up properly."""
-    # Check if .env file exists with the required credentials
-    env_path = Path('.env')
-    if not env_path.exists():
-        return False
-    
-    # Check if the .env file contains the access token
-    with open(env_path, 'r') as f:
-        content = f.read()
-        return 'TICKTICK_ACCESS_TOKEN' in content
+    load_dotenv()
+    return os.getenv("TICKTICK_ACCESS_TOKEN") is not None
 
 def main():
     """Entry point for the CLI."""
