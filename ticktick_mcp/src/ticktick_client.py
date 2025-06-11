@@ -238,15 +238,23 @@ class TickTickClient:
         
         if content:
             data["content"] = content
+            
         if start_date:
             data["startDate"] = start_date
+            
         if due_date:
             data["dueDate"] = due_date
+            
         if priority is not None:
             data["priority"] = priority
+            
         if is_all_day is not None:
             data["isAllDay"] = is_all_day
-            
+        
+        # Add timezone if dates are provided (required by TickTick API)
+        if start_date or due_date:
+            data["timeZone"] = "UTC"
+        
         return self._make_request("POST", "/task", data)
     
     def update_task(self, task_id: str, project_id: str, title: str = None, 

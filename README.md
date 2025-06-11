@@ -1,207 +1,339 @@
 # TickTick MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for TickTick that enables interacting with your TickTick task management system directly through Claude and other MCP clients.
+A powerful [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that enables seamless integration between Claude Desktop and TickTick task management system.
 
-## Features
+<div align="center">
 
-- 📋 View all your TickTick projects and tasks
-- ✏️ Create new projects and tasks through natural language
-- 🔄 Update existing task details (title, content, dates, priority)
-- ✅ Mark tasks as complete
-- 🗑️ Delete tasks and projects
-- 🔄 Full integration with TickTick's open API
-- 🔌 Seamless integration with Claude and other MCP clients
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
 
-## Prerequisites
+</div>
 
-- Python 3.10 or higher
-- [uv](https://github.com/astral-sh/uv) - Fast Python package installer and resolver
-- TickTick account with API access
-- TickTick API credentials (Client ID, Client Secret, Access Token)
+## ✨ Features
 
-## Installation
+### 🔥 **New Enhanced Features**
+- **🌍 Smart Timezone Support** - Automatic timezone detection with manual override options
+- **⚡ Batch Operations** - Create/update multiple tasks simultaneously 
+- **🔍 Advanced Search** - Find tasks by title, content, or project with filters
+- **📊 Analytics & Insights** - Project statistics, overdue tracking, productivity metrics
+- **📅 Smart Scheduling** - Get today's tasks, upcoming deadlines, overdue items
 
-1. **Clone this repository**:
+### 📋 **Core Task Management**
+- **Full CRUD Operations** - Create, read, update, delete tasks and projects
+- **Priority Management** - Set and modify task priorities (None, Low, Medium, High)
+- **Date & Time Handling** - Start dates, due dates with timezone awareness
+- **Project Organization** - Manage multiple projects with different view modes
+- **Task Completion** - Mark tasks as complete with automatic timestamps
+
+### 🔄 **Seamless Integration**
+- **Natural Language Commands** - Control TickTick through conversational Claude interface
+- **Real-time Synchronization** - Changes reflect immediately in TickTick apps
+- **OAuth2 Authentication** - Secure, token-based authentication with auto-refresh
+- **Error Handling** - Robust error recovery and user-friendly messages
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Python 3.10+**
+- **[uv](https://github.com/astral-sh/uv)** - Fast Python package manager
+- **[Claude Desktop](https://claude.ai/download)** 
+- **TickTick Account** with API access
+
+### Installation
+
+1. **Clone the repository**
    ```bash
    git clone https://github.com/jacepark12/ticktick-mcp.git
    cd ticktick-mcp
    ```
 
-2. **Install with uv**:
+2. **Create and activate virtual environment**
    ```bash
-   # Install uv if you don't have it already
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-
-   # Create a virtual environment
    uv venv
-
-   # Activate the virtual environment
-   # On macOS/Linux:
-   source .venv/bin/activate
    # On Windows:
    .venv\Scripts\activate
-
-   # Install the package
-   uv pip install -e .
+   # On macOS/Linux:
+   source .venv/bin/activate
    ```
 
-3. **Authenticate with TickTick**:
+3. **Install dependencies**
    ```bash
-   # Run the authentication flow
+   uv pip install -e .
+   uv pip install tzdata  # For timezone support
+   ```
+
+4. **Set up TickTick API credentials**
+
+   Register your application at [TickTick Developer Center](https://developer.ticktick.com/manage):
+   - Set redirect URI to: `http://localhost:8000/callback`
+   - Note your Client ID and Client Secret
+
+5. **Authenticate with TickTick**
+   ```bash
    uv run -m ticktick_mcp.cli auth
    ```
-
+   
    This will:
-   - Ask for your TickTick Client ID and Client Secret
-   - Open a browser window for you to log in to TickTick
-   - Automatically save your access tokens to a `.env` file
+   - Prompt for your Client ID and Client Secret
+   - Open browser for TickTick authorization
+   - Automatically save tokens to `.env` file
 
-4. **Test your configuration**:
+6. **Test the setup**
    ```bash
    uv run test_server.py
    ```
-   This will verify that your TickTick credentials are working correctly.
 
-## Authentication with TickTick
+### Claude Desktop Configuration
 
-This server uses OAuth2 to authenticate with TickTick. The setup process is straightforward:
-
-1. Register your application at the [TickTick Developer Center](https://developer.ticktick.com/manage)
-   - Set the redirect URI to `http://localhost:8000/callback`
-   - Note your Client ID and Client Secret
-
-2. Run the authentication command:
+1. **Find uv path**
    ```bash
-   uv run -m ticktick_mcp.cli auth
+   # Windows
+   where uv
+   # macOS/Linux  
+   which uv
    ```
 
-3. Follow the prompts to enter your Client ID and Client Secret
+2. **Edit Claude Desktop config**
 
-4. A browser window will open for you to authorize the application with your TickTick account
+   **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   
+   **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-5. After authorizing, you'll be redirected back to the application, and your access tokens will be automatically saved to the `.env` file
-
-The server handles token refresh automatically, so you won't need to reauthenticate unless you revoke access or delete your `.env` file.
-
-## Authentication with Dida365
-
-[滴答清单 - Dida365](https://dida365.com/home) is China version of TickTick, and the authentication process is similar to TickTick. Follow these steps to set up Dida365 authentication:
-
-1. Register your application at the [Dida365 Developer Center](https://developer.dida365.com/manage)
-   - Set the redirect URI to `http://localhost:8000/callback`
-   - Note your Client ID and Client Secret
-
-2. Add environment variables to your `.env` file:
-   ```env
-   TICKTICK_BASE_URL='https://api.dida365.com/open/v1'
-   TICKTICK_AUTH_URL='https://dida365.com/oauth/authorize'
-   TICKTICK_TOKEN_URL='https://dida365.com/oauth/token'
-   ```
-
-3. Follow the same authentication steps as for TickTick
-
-## Usage with Claude for Desktop
-
-1. Install [Claude for Desktop](https://claude.ai/download)
-2. Edit your Claude for Desktop configuration file:
-
-   **macOS**:
-   ```bash
-   nano ~/Library/Application\ Support/Claude/claude_desktop_config.json
-   ```
-
-   **Windows**:
-   ```bash
-   notepad %APPDATA%\Claude\claude_desktop_config.json
-   ```
-
-3. Add the TickTick MCP server configuration, using absolute paths:
    ```json
    {
-      "mcpServers": {
-         "ticktick": {
-            "command": "<absolute path to uv>",
-            "args": ["run", "--directory", "<absolute path to ticktick-mcp directory>", "-m", "ticktick_mcp.cli", "run"]
-         }
-      }
+     "mcpServers": {
+       "ticktick": {
+         "command": "/path/to/uv",
+         "args": ["run", "--directory", "/path/to/ticktick-mcp", "-m", "ticktick_mcp.cli", "run"]
+       }
+     }
    }
    ```
 
-4. Restart Claude for Desktop
+3. **Restart Claude Desktop**
 
-Once connected, you'll see the TickTick MCP server tools available in Claude, indicated by the 🔨 (tools) icon.
+## 🎯 Usage Examples
 
-## Available MCP Tools
+### Basic Operations
+```
+"Show me all my TickTick projects"
+"Create a task 'Buy groceries' in my Personal project"
+"List all tasks in my Work project"
+"Mark task 'Complete report' as done"
+```
+
+### Advanced Features
+```
+"Create 5 tasks for my morning routine in Personal project"
+"Show me all overdue tasks"
+"Find all tasks containing 'meeting'"
+"What tasks do I have due today?"
+"Show statistics for my Work project"
+"Get upcoming tasks for next 7 days"
+```
+
+### Batch Operations
+```
+"Create multiple tasks: 'Review code', 'Write tests', 'Deploy to staging' all in Development project"
+"Update all overdue tasks to be due tomorrow with high priority"
+```
+
+### Analytics & Insights
+```
+"Show project statistics for Work"
+"Which tasks are overdue across all projects?"
+"What's my completion rate this month?"
+"Show me upcoming deadlines for next week"
+```
+
+## 🛠 Available Tools
+
+<details>
+<summary><strong>📝 Task Management</strong></summary>
 
 | Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_projects` | List all your TickTick projects | None |
-| `get_project` | Get details about a specific project | `project_id` |
-| `get_project_tasks` | List all tasks in a project | `project_id` |
-| `get_task` | Get details about a specific task | `project_id`, `task_id` |
-| `create_task` | Create a new task | `title`, `project_id`, `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional) |
-| `update_task` | Update an existing task | `task_id`, `project_id`, `title` (optional), `content` (optional), `start_date` (optional), `due_date` (optional), `priority` (optional) |
-| `complete_task` | Mark a task as complete | `project_id`, `task_id` |
-| `delete_task` | Delete a task | `project_id`, `task_id` |
-| `create_project` | Create a new project | `name`, `color` (optional), `view_mode` (optional) |
-| `delete_project` | Delete a project | `project_id` |
+|------|-------------|-------------|
+| `get_task` | Get specific task details | `project_id`, `task_id` |
+| `create_task` | Create new task | `title`, `project_id`, `content?`, `start_date?`, `due_date?`, `priority?` |
+| `update_task` | Update existing task | `task_id`, `project_id`, `title?`, `content?`, `start_date?`, `due_date?`, `priority?` |
+| `complete_task` | Mark task as complete | `project_id`, `task_id` |
+| `delete_task` | Delete task | `project_id`, `task_id` |
 
-## Example Prompts for Claude
+</details>
 
-Here are some example prompts to use with Claude after connecting the TickTick MCP server:
+<details>
+<summary><strong>📁 Project Management</strong></summary>
 
-- "Show me all my TickTick projects"
-- "Create a new task called 'Finish MCP server documentation' in my work project with high priority"
-- "List all tasks in my personal project"
-- "Mark the task 'Buy groceries' as complete"
-- "Create a new project called 'Vacation Planning' with a blue color"
-- "When is my next deadline in TickTick?"
+| Tool | Description | Parameters |
+|------|-------------|-------------|
+| `get_projects` | List all projects | None |
+| `get_project` | Get specific project | `project_id` |
+| `get_project_tasks` | Get all tasks in project | `project_id` |
+| `create_project` | Create new project | `name`, `color?`, `view_mode?` |
+| `delete_project` | Delete project | `project_id` |
 
-## Development
+</details>
 
-### Project Structure
+<details>
+<summary><strong>⚡ Batch Operations</strong></summary>
+
+| Tool | Description | Parameters |
+|------|-------------|-------------|
+| `create_multiple_tasks` | Create multiple tasks efficiently | `tasks` (array of task objects) |
+| `update_task_batch` | Update multiple tasks at once | `updates` (array of update objects) |
+
+</details>
+
+<details>
+<summary><strong>🔍 Search & Analytics</strong></summary>
+
+| Tool | Description | Parameters |
+|------|-------------|-------------|
+| `search_tasks` | Search tasks by content/title | `query`, `project_id?`, `include_completed?` |
+| `get_overdue_tasks` | Get all overdue tasks | `project_id?` |
+| `get_today_tasks` | Get tasks due today | `project_id?` |
+| `get_upcoming_tasks` | Get tasks due in next N days | `days?`, `project_id?` |
+| `get_project_stats` | Get detailed project statistics | `project_id` |
+
+</details>
+
+## ⚙️ Configuration
+
+### Timezone Settings
+
+Set your timezone in `.env` file:
+```env
+TICKTICK_USER_TIMEZONE=America/New_York  # Eastern Time
+TICKTICK_USER_TIMEZONE=Europe/London     # GMT
+TICKTICK_USER_TIMEZONE=Asia/Tokyo        # JST
+```
+
+**Auto-detection**: If not set, the system will attempt to detect your timezone automatically.
+
+### Dida365 Support
+
+For users of [Dida365](https://dida365.com/) (Chinese version of TickTick):
+
+1. Register at [Dida365 Developer Center](https://developer.dida365.com/manage)
+2. Add to your `.env` file:
+   ```env
+   TICKTICK_BASE_URL=https://api.dida365.com/open/v1
+   TICKTICK_AUTH_URL=https://dida365.com/oauth/authorize
+   TICKTICK_TOKEN_URL=https://dida365.com/oauth/token
+   ```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+<details>
+<summary><strong>"Server disconnected" in Claude Desktop</strong></summary>
+
+**Solutions:**
+1. Check uv path: `where uv` (Windows) or `which uv` (macOS/Linux)
+2. Verify config file uses correct absolute paths
+3. Use forward slashes `/` in JSON paths
+4. Completely restart Claude Desktop
+5. Check logs: Click "Open Logs Folder" in Claude Desktop
+
+</details>
+
+<details>
+<summary><strong>"Access token expired"</strong></summary>
+
+**Solution:**
+```bash
+cd ticktick-mcp
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+uv run -m ticktick_mcp.cli auth
+```
+
+</details>
+
+<details>
+<summary><strong>"ZoneInfoNotFoundError"</strong></summary>
+
+**Solution:**
+```bash
+uv pip install tzdata
+```
+
+</details>
+
+<details>
+<summary><strong>"No virtual environment found"</strong></summary>
+
+**Solution:**
+```bash
+cd ticktick-mcp
+uv venv
+.venv\Scripts\activate  # Windows
+# or
+source .venv/bin/activate  # macOS/Linux
+uv pip install -e .
+```
+
+</details>
+
+## 🏗️ Project Structure
 
 ```
 ticktick-mcp/
-├── .env.template          # Template for environment variables
-├── README.md              # Project documentation
-├── requirements.txt       # Project dependencies
-├── setup.py               # Package setup file
-├── test_server.py         # Test script for server configuration
+├── .env.template           # Environment variables template
+├── README.md              # This file
+├── requirements.txt       # Python dependencies
+├── setup.py              # Package setup
+├── test_server.py         # Connection test script
 └── ticktick_mcp/          # Main package
-    ├── __init__.py        # Package initialization
+    ├── __init__.py
     ├── authenticate.py    # OAuth authentication utility
-    ├── cli.py             # Command-line interface
-    └── src/               # Source code
-        ├── __init__.py    # Module initialization
-        ├── auth.py        # OAuth authentication implementation
-        ├── server.py      # MCP server implementation
+    ├── cli.py            # Command-line interface
+    └── src/              # Source code
+        ├── __init__.py
+        ├── auth.py       # OAuth implementation
+        ├── server.py     # MCP server implementation
         └── ticktick_client.py  # TickTick API client
 ```
 
-### Authentication Flow
+## 📊 What's New in v2.0
 
-The project implements a complete OAuth 2.0 flow for TickTick:
+- **🌍 Enhanced Timezone Support** - Smart detection + manual override
+- **⚡ Batch Operations** - Process multiple tasks simultaneously
+- **🔍 Advanced Search** - Find tasks across projects with filters
+- **📊 Analytics Dashboard** - Project statistics and productivity insights
+- **📅 Smart Scheduling** - Today's tasks, upcoming deadlines, overdue tracking
+- **🔄 Improved Error Handling** - Better user feedback and recovery
+- **🚀 Performance Optimizations** - Faster task processing and API calls
 
-1. **Initial Setup**: User provides their TickTick API Client ID and Secret
-2. **Browser Authorization**: User is redirected to TickTick to grant access
-3. **Token Reception**: A local server receives the OAuth callback with the authorization code
-4. **Token Exchange**: The code is exchanged for access and refresh tokens
-5. **Token Storage**: Tokens are securely stored in the local `.env` file
-6. **Token Refresh**: The client automatically refreshes the access token when it expires
-
-This simplifies the user experience by handling the entire OAuth flow programmatically.
-
-### Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [Model Context Protocol](https://modelcontextprotocol.io/) for the amazing protocol
+- [TickTick](https://ticktick.com/) for the robust API
+- [Claude](https://claude.ai/) for the powerful AI integration
+- All contributors and users who made this project better
+
+---
+
+<div align="center">
+
+**Made with ❤️ by [Jaesung Park](https://github.com/parkjs814) & [Ilya P](https://github.com/RaiconY)**
+
+[⭐ Star this repo](https://github.com/jacepark12/ticktick-mcp) | [🐛 Report Bug](https://github.com/jacepark12/ticktick-mcp/issues) | [💡 Request Feature](https://github.com/jacepark12/ticktick-mcp/issues)
+
+</div>
