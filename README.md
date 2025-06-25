@@ -166,6 +166,111 @@ A powerful [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) serv
 <details>
 <summary><strong>📁 Project Management</strong></summary>
 
+## Docker Usage
+
+You can run the TickTick MCP server inside a Docker container using the SSE transport option:
+
+1. **Build the Docker image**:
+   ```bash
+   docker build -t ticktick-mcp .
+   ```
+
+2. **Run the container with SSE transport**:
+   ```bash
+   docker run -p 3434:3434 -v $(pwd)/.env:/app/.env ticktick-mcp uv run -m ticktick_mcp.cli run --transport sse --host 0.0.0.0 --port 3434
+   ```
+
+3. **Configure Claude to connect to the containerized server**:
+   Edit your Claude configuration file and add the following:
+   ```json
+   {
+      "mcpServers": {
+         "ticktick": {
+            "url": "http://localhost:3434"
+         }
+      }
+   }
+   ```
+
+4. **Authentication in Docker**:
+   You have two options for authentication in Docker:
+   
+   **Option 1: Mount .env file from host**
+   Run the authentication process outside of Docker to create the `.env` file, then mount it:
+   ```bash
+   # On your host machine
+   uv run -m ticktick_mcp.cli auth
+   
+   # Then run Docker with the .env file mounted
+   docker run -p 3434:3434 -v $(pwd)/.env:/app/.env ticktick-mcp
+   ```
+   
+   **Option 2: Pass environment variables directly**
+   Pass the TickTick authentication tokens as environment variables:
+   ```bash
+   docker run -p 3434:3434 \
+     -e TICKTICK_CLIENT_ID=your_client_id \
+     -e TICKTICK_CLIENT_SECRET=your_client_secret \
+     -e TICKTICK_ACCESS_TOKEN=your_access_token \
+     -e TICKTICK_REFRESH_TOKEN=your_refresh_token \
+     ghcr.io/egv/ticktick-mcp:latest
+   ```
+
+### Docker Compose Example
+
+**Option 1: With mounted .env file**
+```yaml
+services:
+  ticktick-mcp:
+    build: .
+    ports:
+      - "3434:3434"
+    volumes:
+      - ./.env:/app/.env
+    command: uv run -m ticktick_mcp.cli run --transport sse --host 0.0.0.0 --port 3434
+```
+
+**Option 2: With environment variables**
+```yaml
+services:
+  ticktick-mcp:
+    image: ghcr.io/egv/ticktick-mcp:latest
+    ports:
+      - "3434:3434"
+    environment:
+      - TICKTICK_CLIENT_ID=your_client_id
+      - TICKTICK_CLIENT_SECRET=your_client_secret
+      - TICKTICK_ACCESS_TOKEN=your_access_token
+      - TICKTICK_REFRESH_TOKEN=your_refresh_token
+    restart: unless-stopped
+```
+
+### Using the GitHub Container Registry Image
+
+The Docker image is automatically built and published to GitHub Container Registry. You can use the pre-built image instead of building it yourself:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/egv/ticktick-mcp:latest
+
+# Run with SSE transport
+docker run -p 3434:3434 -v $(pwd)/.env:/app/.env ghcr.io/egv/ticktick-mcp:latest
+```
+
+Or in your docker-compose.yml:
+
+```yaml
+services:
+  ticktick-mcp:
+    image: ghcr.io/egv/ticktick-mcp:latest
+    ports:
+      - "3434:3434"
+    volumes:
+      - ./.env:/app/.env
+    restart: unless-stopped
+```
+
+## Available MCP Tools
 | Tool | Description | Parameters |
 |------|-------------|-------------|
 | `get_projects` | List all projects | None |

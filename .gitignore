@@ -32,3 +32,4 @@ Thumbs.db
 
 # Others
 mcp.txt
+**/.claude/settings.local.json

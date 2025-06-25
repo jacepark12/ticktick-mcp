@@ -1,0 +1,24 @@
+services:
+  # Option 1: Using mounted .env file
+  ticktick-mcp:
+    build: .
+    ports:
+      - "3434:3434"
+    volumes:
+      - ./.env:/app/.env
+    restart: unless-stopped
+    # Default command is already defined in Dockerfile
+    # Uncomment to override:
+    # command: uv run -m ticktick_mcp.cli run --transport sse --host 0.0.0.0 --port 3434
+
+  # Option 2: Using environment variables (uncomment and configure to use)
+  # ticktick-mcp-env:
+  #   image: ghcr.io/egv/ticktick-mcp:latest
+  #   ports:
+  #     - "3434:3434"
+  #   environment:
+  #     - TICKTICK_CLIENT_ID=${TICKTICK_CLIENT_ID}
+  #     - TICKTICK_CLIENT_SECRET=${TICKTICK_CLIENT_SECRET}
+  #     - TICKTICK_ACCESS_TOKEN=${TICKTICK_ACCESS_TOKEN}
+  #     - TICKTICK_REFRESH_TOKEN=${TICKTICK_REFRESH_TOKEN}
+  #   restart: unless-stopped

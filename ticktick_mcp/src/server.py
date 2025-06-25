@@ -9,17 +9,223 @@ import time
 import re
 import subprocess
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.lowlevel import Server
+from mcp.server.sse import SseServerTransport
 from dotenv import load_dotenv
+
 
 from .ticktick_client import TickTickClient
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Get MCP logger
 logger = logging.getLogger(__name__)
 
-# Create FastMCP server
-mcp = FastMCP("ticktick")
+# Create Server
+mcp = Server("ticktick")
+
+@mcp.list_tools()
+async def list_tools() -> list[types.Tool]:
+    """List all available tools."""
+    return [
+        types.Tool(
+            name="get_projects",
+            description="Get all projects from TickTick.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        ),
+        types.Tool(
+            name="get_project",
+            description="Get details about a specific project.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID of the project"
+                    }
+                },
+                "required": ["project_id"]
+            }
+        ),
+        types.Tool(
+            name="get_project_tasks",
+            description="Get all tasks in a specific project.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID of the project"
+                    }
+                },
+                "required": ["project_id"]
+            }
+        ),
+        types.Tool(
+            name="get_task",
+            description="Get details about a specific task.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID of the project"
+                    },
+                    "task_id": {
+                        "type": "string",
+                        "description": "ID of the task"
+                    }
+                },
+                "required": ["project_id", "task_id"]
+            }
+        ),
+        types.Tool(
+            name="create_task",
+            description="Create a new task in TickTick.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Task title"
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID of the project to add the task to"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Task description/content (optional)"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "Start date in ISO format YYYY-MM-DDThh:mm:ss+0000 (optional)"
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "description": "Due date in ISO format YYYY-MM-DDThh:mm:ss+0000 (optional)"
+                    },
+                    "priority": {
+                        "type": "integer",
+                        "description": "Priority level (0: None, 1: Low, 3: Medium, 5: High) (optional)"
+                    }
+                },
+                "required": ["title", "project_id"]
+            }
+        ),
+        types.Tool(
+            name="update_task",
+            description="Update an existing task in TickTick.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "string",
+                        "description": "ID of the task to update"
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID of the project the task belongs to"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "New task title (optional)"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "New task description/content (optional)"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "New start date in ISO format YYYY-MM-DDThh:mm:ss+0000 (optional)"
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "description": "New due date in ISO format YYYY-MM-DDThh:mm:ss+0000 (optional)"
+                    },
+                    "priority": {
+                        "type": "integer",
+                        "description": "New priority level (0: None, 1: Low, 3: Medium, 5: High) (optional)"
+                    }
+                },
+                "required": ["task_id", "project_id"]
+            }
+        ),
+        types.Tool(
+            name="complete_task",
+            description="Mark a task as complete.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID of the project"
+                    },
+                    "task_id": {
+                        "type": "string",
+                        "description": "ID of the task"
+                    }
+                },
+                "required": ["project_id", "task_id"]
+            }
+        ),
+        types.Tool(
+            name="delete_task",
+            description="Delete a task.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID of the project"
+                    },
+                    "task_id": {
+                        "type": "string",
+                        "description": "ID of the task"
+                    }
+                },
+                "required": ["project_id", "task_id"]
+            }
+        ),
+        types.Tool(
+            name="create_project",
+            description="Create a new project in TickTick.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Project name"
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": "Color code (hex format) (optional)"
+                    },
+                    "view_mode": {
+                        "type": "string",
+                        "description": "View mode - one of list, kanban, or timeline (optional)"
+                    }
+                },
+                "required": ["name"]
+            }
+        ),
+        types.Tool(
+            name="delete_project",
+            description="Delete a project.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID of the project"
+                    }
+                },
+                "required": ["project_id"]
+            }
+        )
+    ]
 
 # Create TickTick client
 ticktick = None
@@ -125,10 +331,9 @@ def initialize_client():
         projects = ticktick.get_projects()
         if 'error' in projects:
             logger.error(f"Failed to access TickTick API: {projects['error']}")
-            logger.error("Your access token may have expired. Please run 'uv run -m ticktick_mcp.cli auth' to refresh it.")
+            logger.error("Your access token may have expired. Please run 'uv run -m ticktick_mcp.cli auth' to refresh it or update your environment variables.")
             return False
             
-        logger.info(f"Successfully connected to TickTick API with {len(projects)} projects")
         return True
     except Exception as e:
         logger.error(f"Failed to initialize TickTick client: {e}")
@@ -261,8 +466,8 @@ def format_project(project: Dict) -> str:
 
 # MCP Tools
 
-@mcp.tool()
-async def get_projects() -> str:
+@mcp.call_tool()
+async def get_projects(request) -> str:
     """Get all projects from TickTick."""
     if not ticktick:
         if not initialize_client():
@@ -282,11 +487,11 @@ async def get_projects() -> str:
         
         return result
     except Exception as e:
-        logger.error(f"Error in get_projects: {e}")
         return f"Error retrieving projects: {str(e)}"
 
-@mcp.tool()
-async def get_project(project_id: str) -> str:
+@mcp.call_tool()
+async def get_project(request) -> str:
+    project_id = request.get("project_id")
     """
     Get details about a specific project.
     
@@ -304,11 +509,11 @@ async def get_project(project_id: str) -> str:
         
         return format_project(project)
     except Exception as e:
-        logger.error(f"Error in get_project: {e}")
         return f"Error retrieving project: {str(e)}"
 
-@mcp.tool()
-async def get_project_tasks(project_id: str) -> str:
+@mcp.call_tool()
+async def get_project_tasks(request) -> str:
+    project_id = request.get("project_id")
     """
     Get all tasks in a specific project.
     
@@ -334,11 +539,12 @@ async def get_project_tasks(project_id: str) -> str:
         
         return result
     except Exception as e:
-        logger.error(f"Error in get_project_tasks: {e}")
         return f"Error retrieving project tasks: {str(e)}"
 
-@mcp.tool()
-async def get_task(project_id: str, task_id: str) -> str:
+@mcp.call_tool()
+async def get_task(request) -> str:
+    project_id = request.get("project_id")
+    task_id = request.get("task_id")
     """
     Get details about a specific task.
     
@@ -357,18 +563,16 @@ async def get_task(project_id: str, task_id: str) -> str:
         
         return format_task(task)
     except Exception as e:
-        logger.error(f"Error in get_task: {e}")
         return f"Error retrieving task: {str(e)}"
 
-@mcp.tool()
-async def create_task(
-    title: str, 
-    project_id: str, 
-    content: str = None, 
-    start_date: str = None, 
-    due_date: str = None, 
-    priority: int = 0
-) -> str:
+@mcp.call_tool()
+async def create_task(request) -> str:
+    title = request.get("title")
+    project_id = request.get("project_id")
+    content = request.get("content")
+    start_date = request.get("start_date")
+    due_date = request.get("due_date")
+    priority = request.get("priority", 0)
     """
     Create a new task in TickTick with timezone support.
     
@@ -418,7 +622,6 @@ async def create_task(
         
         return f"Task created successfully:\n\n" + format_task(task)
     except Exception as e:
-        logger.error(f"Error in create_task: {e}")
         return f"Error creating task: {str(e)}"
 
 # NEW: Batch create multiple tasks
@@ -1187,11 +1390,12 @@ async def update_task(
         
         return f"Task updated successfully:\n\n" + format_task(task)
     except Exception as e:
-        logger.error(f"Error in update_task: {e}")
         return f"Error updating task: {str(e)}"
 
-@mcp.tool()
-async def complete_task(project_id: str, task_id: str) -> str:
+@mcp.call_tool()
+async def complete_task(request) -> str:
+    project_id = request.get("project_id")
+    task_id = request.get("task_id")
     """
     Mark a task as complete.
     
@@ -1210,11 +1414,12 @@ async def complete_task(project_id: str, task_id: str) -> str:
         
         return f"Task {task_id} marked as complete."
     except Exception as e:
-        logger.error(f"Error in complete_task: {e}")
         return f"Error completing task: {str(e)}"
 
-@mcp.tool()
-async def delete_task(project_id: str, task_id: str) -> str:
+@mcp.call_tool()
+async def delete_task(request) -> str:
+    project_id = request.get("project_id")
+    task_id = request.get("task_id")
     """
     Delete a task.
     
@@ -1233,15 +1438,13 @@ async def delete_task(project_id: str, task_id: str) -> str:
         
         return f"Task {task_id} deleted successfully."
     except Exception as e:
-        logger.error(f"Error in delete_task: {e}")
         return f"Error deleting task: {str(e)}"
 
-@mcp.tool()
-async def create_project(
-    name: str,
-    color: str = "#F18181",
-    view_mode: str = "list"
-) -> str:
+@mcp.call_tool()
+async def create_project(request) -> str:
+    name = request.get("name")
+    color = request.get("color", "#F18181")
+    view_mode = request.get("view_mode", "list")
     """
     Create a new project in TickTick.
     
@@ -1270,11 +1473,11 @@ async def create_project(
         
         return f"Project created successfully:\n\n" + format_project(project)
     except Exception as e:
-        logger.error(f"Error in create_project: {e}")
         return f"Error creating project: {str(e)}"
 
-@mcp.tool()
-async def delete_project(project_id: str) -> str:
+@mcp.call_tool()
+async def delete_project(request) -> str:
+    project_id = request.get("project_id")
     """
     Delete a project.
     
@@ -1292,18 +1495,72 @@ async def delete_project(project_id: str) -> str:
         
         return f"Project {project_id} deleted successfully."
     except Exception as e:
-        logger.error(f"Error in delete_project: {e}")
         return f"Error deleting project: {str(e)}"
 
-def main():
-    """Main entry point for the MCP server."""
+def main(transport='stdio', host='127.0.0.1', port=3434):
+    """
+    Main entry point for the MCP server.
+    
+    Args:
+        transport: Transport type ('stdio' or 'sse')
+        host: Host to bind to when using SSE transport
+        port: Port to use when using SSE transport
+    """
     # Initialize the TickTick client
     if not initialize_client():
         logger.error("Failed to initialize TickTick client. Please check your API credentials.")
         return
     
-    # Run the server
-    mcp.run(transport='stdio')
+    # Run the server with the specified transport
+    if transport == 'sse':
+        print(f"Starting TickTick MCP server with SSE transport on {host}:{port}")
+        
+        # Configure the SSE transport endpoint to match what clients expect
+        SseServerTransport.ENDPOINT = "/sse"
+        
+        # Create an SSE transport
+        sse = SseServerTransport("/messages/")
+        
+        # Define SSE handler
+        async def handle_sse(request):
+            async with sse.connect_sse(
+                request.scope, request.receive, request._send
+            ) as streams:
+                await mcp.run(streams[0], streams[1], mcp.create_initialization_options())
+            return Response()
+        
+        # Create Starlette app with routes
+        from starlette.applications import Starlette
+        from starlette.responses import Response
+        from starlette.routing import Mount, Route
+        
+        starlette_app = Starlette(
+            debug=True,
+            routes=[
+                Route("/sse", endpoint=handle_sse, methods=["GET"]),
+                Mount("/messages/", app=sse.handle_post_message),
+            ]
+        )
+        
+        # Print connection info
+        print(f"\n========= CONNECTION INFO =========")
+        print(f"Connect to this server at:")
+        print(f"URL: http://{host}:{port}")
+        print(f"SSE endpoint: {SseServerTransport.ENDPOINT}")
+        print(f"=======================================\n")
+        
+        # Run the Starlette app with Uvicorn
+        uvicorn.run(
+            starlette_app, 
+            host=host, 
+            port=port, 
+            log_level="info"
+        )
+    else:
+        print("Starting TickTick MCP server with stdio transport")
+        # For stdio, we need to run in an async context
+        import asyncio
+        asyncio.run(mcp.run_stdio(mcp.create_initialization_options()))
 
 if __name__ == "__main__":
     main()
