@@ -240,12 +240,47 @@ async def create_task(
         return "Invalid priority. Must be 0 (None), 1 (Low), 3 (Medium), or 5 (High)."
     
     try:
-        # Validate dates if provided
+        # Validate and convert dates if provided
         for date_str, date_name in [(start_date, "start_date"), (due_date, "due_date")]:
             if date_str:
                 try:
-                    # Try to parse the date to validate it
-                    datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                    # Normalize the date for validation (Python expects colons in timezone)
+                    validation_str = date_str
+                    if date_str.endswith("Z"):
+                        validation_str = date_str.replace("Z", "+00:00")
+                    elif "+0000" in date_str:
+                        validation_str = date_str.replace("+0000", "+00:00")
+                    elif date_str.count("+") == 1 and ":" not in date_str.split("+")[1]:
+                        # Handle +0200 format -> +02:00
+                        parts = date_str.split("+")
+                        if len(parts[1]) == 4:  # +HHMM format
+                            hours, minutes = parts[1][:2], parts[1][2:]
+                            validation_str = f"{parts[0]}+{hours}:{minutes}"
+                    
+                    # Validate the date
+                    datetime.fromisoformat(validation_str)
+                    
+                    # Convert to TickTick API format (+0000 without colon)
+                    api_format = date_str
+                    if date_str.endswith("Z"):
+                        api_format = date_str.replace("Z", "+0000")
+                    elif "+00:00" in date_str:
+                        api_format = date_str.replace("+00:00", "+0000")
+                    elif date_str.count("+") == 1 and ":" in date_str.split("+")[1]:
+                        # Handle +02:00 format -> +0200
+                        parts = date_str.split("+")
+                        timezone_part = parts[1].replace(":", "")
+                        api_format = f"{parts[0]}+{timezone_part}"
+                    elif not any(tz in date_str for tz in ["+", "Z"]):
+                        # No timezone specified, assume UTC
+                        api_format = date_str + "+0000"
+                    
+                    # Update the variable with the API-compatible format
+                    if date_name == "start_date":
+                        start_date = api_format
+                    else:
+                        due_date = api_format
+                        
                 except ValueError:
                     return f"Invalid {date_name} format. Use ISO format: YYYY-MM-DDThh:mm:ss+0000"
         
@@ -297,12 +332,47 @@ async def update_task(
         return "Invalid priority. Must be 0 (None), 1 (Low), 3 (Medium), or 5 (High)."
     
     try:
-        # Validate dates if provided
+        # Validate and convert dates if provided
         for date_str, date_name in [(start_date, "start_date"), (due_date, "due_date")]:
             if date_str:
                 try:
-                    # Try to parse the date to validate it
-                    datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                    # Normalize the date for validation (Python expects colons in timezone)
+                    validation_str = date_str
+                    if date_str.endswith("Z"):
+                        validation_str = date_str.replace("Z", "+00:00")
+                    elif "+0000" in date_str:
+                        validation_str = date_str.replace("+0000", "+00:00")
+                    elif date_str.count("+") == 1 and ":" not in date_str.split("+")[1]:
+                        # Handle +0200 format -> +02:00
+                        parts = date_str.split("+")
+                        if len(parts[1]) == 4:  # +HHMM format
+                            hours, minutes = parts[1][:2], parts[1][2:]
+                            validation_str = f"{parts[0]}+{hours}:{minutes}"
+                    
+                    # Validate the date
+                    datetime.fromisoformat(validation_str)
+                    
+                    # Convert to TickTick API format (+0000 without colon)
+                    api_format = date_str
+                    if date_str.endswith("Z"):
+                        api_format = date_str.replace("Z", "+0000")
+                    elif "+00:00" in date_str:
+                        api_format = date_str.replace("+00:00", "+0000")
+                    elif date_str.count("+") == 1 and ":" in date_str.split("+")[1]:
+                        # Handle +02:00 format -> +0200
+                        parts = date_str.split("+")
+                        timezone_part = parts[1].replace(":", "")
+                        api_format = f"{parts[0]}+{timezone_part}"
+                    elif not any(tz in date_str for tz in ["+", "Z"]):
+                        # No timezone specified, assume UTC
+                        api_format = date_str + "+0000"
+                    
+                    # Update the variable with the API-compatible format
+                    if date_name == "start_date":
+                        start_date = api_format
+                    else:
+                        due_date = api_format
+                        
                 except ValueError:
                     return f"Invalid {date_name} format. Use ISO format: YYYY-MM-DDThh:mm:ss+0000"
         
