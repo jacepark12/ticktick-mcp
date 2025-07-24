@@ -429,6 +429,52 @@ async def delete_project(project_id: str) -> str:
         logger.error(f"Error in delete_project: {e}")
         return f"Error deleting project: {str(e)}"
 
+@mcp.tool()
+async def search_tasks(keywords: List[str]) -> str:
+    """
+    Searches for tasks across all projects based on provided keywords.
+
+    Args:
+        keywords: A list of keywords to search for in task titles or content.
+    """
+    if not ticktick:
+        if not initialize_client():
+            return "Failed to initialize TickTick client. Please check your API credentials."
+
+    try:
+        all_tasks = []
+        projects = ticktick.get_projects()
+        if 'error' in projects:
+            return f"Error getting projects for task search: {projects['error']}"
+
+        for project in projects:
+            project_id = project.get('id')
+            project_data = ticktick.get_project_with_data(project_id)
+            if 'error' in project_data:
+                logger.warning(f"Error getting tasks for project {project_id}: {project_data['error']}")
+                continue
+            all_tasks.extend(project_data.get('tasks', []))
+
+        # Filter tasks based on keywords
+        filtered_tasks = []
+        for task in all_tasks:
+            title = task.get('title', '').lower()
+            content = task.get('content', '').lower()
+            
+            # Check if any keyword is present in title or content
+            if any(keyword.lower() in title or keyword.lower() in content for keyword in keywords):
+                filtered_tasks.append(task)
+
+        if not filtered_tasks:
+            return "No tasks found matching the provided keywords."
+        
+        formatted_tasks = [format_task(t) for t in filtered_tasks]
+        return "Found tasks:\n\n" + "\n---\n".join(formatted_tasks)
+
+    except Exception as e:
+        logger.error(f"Error in search_tasks: {e}")
+        return f"Error searching tasks: {str(e)}"
+
 def main():
     """Main entry point for the MCP server."""
     # Initialize the TickTick client
