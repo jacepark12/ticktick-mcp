@@ -212,6 +212,48 @@ async def get_task(project_id: str, task_id: str) -> str:
         return f"Error retrieving task: {str(e)}"
 
 @mcp.tool()
+async def get_all_tasks() -> str:
+    """
+    Get all tasks across all projects, including Inbox.
+    This is useful when tasks are organized by tags rather than projects.
+    """
+    if not ticktick:
+        if not initialize_client():
+            return "Failed to initialize TickTick client. Please check your API credentials."
+    
+    try:
+        all_tasks = ticktick.get_all_tasks()
+        
+        if not all_tasks:
+            return "No tasks found across all projects."
+        
+        # Group tasks by project for better organization
+        tasks_by_project = {}
+        for task in all_tasks:
+            project_name = task.get("projectName", "Unknown Project")
+            if project_name not in tasks_by_project:
+                tasks_by_project[project_name] = []
+            tasks_by_project[project_name].append(task)
+        
+        result = f"Found {len(all_tasks)} tasks across all projects:\n\n"
+        
+        # Sort projects to show Inbox first if present
+        sorted_projects = sorted(tasks_by_project.items(), 
+                               key=lambda x: (x[0] != "Inbox", x[0]))
+        
+        for project_name, tasks in sorted_projects:
+            result += f"=== {project_name} ({len(tasks)} tasks) ===\n\n"
+            for i, task in enumerate(tasks, 1):
+                result += f"Task {i}:\n{format_task(task)}\n"
+                result += "-" * 50 + "\n\n"
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error retrieving all tasks: {e}")
+        return f"Error retrieving all tasks: {str(e)}"
+
+@mcp.tool()
 async def create_task(
     title: str, 
     project_id: str, 

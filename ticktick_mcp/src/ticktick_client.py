@@ -278,3 +278,32 @@ class TickTickClient:
     def delete_task(self, project_id: str, task_id: str) -> Dict:
         """Deletes a task."""
         return self._make_request("DELETE", f"/project/{project_id}/task/{task_id}")
+    
+    # Additional methods for getting all tasks
+    def get_all_tasks(self) -> List[Dict]:
+        """
+        Gets all tasks across all projects.
+        Since the API doesn't provide a direct endpoint for this,
+        we fetch all projects and then get tasks from each.
+        """
+        all_tasks = []
+        
+        # First get all projects
+        projects = self.get_projects()
+        if isinstance(projects, dict) and "error" in projects:
+            return []
+        
+        # For each project, get its data (which includes tasks)
+        for project in projects:
+            project_id = project.get("id")
+            if project_id:
+                project_data = self.get_project_with_data(project_id)
+                if isinstance(project_data, dict) and "tasks" in project_data:
+                    tasks = project_data.get("tasks", [])
+                    # Add project info to each task for context
+                    for task in tasks:
+                        task["projectName"] = project.get("name", "Unknown")
+                        task["projectColor"] = project.get("color", "#000000")
+                    all_tasks.extend(tasks)
+        
+        return all_tasks
