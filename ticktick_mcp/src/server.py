@@ -981,15 +981,23 @@ async def create_subtask(
         logger.error(f"Error in create_subtask: {e}")
         return f"Error creating subtask: {str(e)}"
 
-def main(transport='stdio'):
+def main(transport='stdio', host='127.0.0.1', port=8000):
     """Main entry point for the MCP server."""
     # Initialize the TickTick client
     if not initialize_client():
         logger.error("Failed to initialize TickTick client. Please check your API credentials.")
         return
 
-    # Run the server with the selected transport
-    mcp.run(transport=transport)
+    if transport == 'stdio':
+        # Use standard input/output for MCP
+        mcp.run(transport='stdio')
+    elif transport == 'streamable-http':
+        # Use Streamable HTTP transport with specified host and port
+        mcp.settings.host = host
+        mcp.settings.port = port
+        mcp.run(transport='streamable-http')
+
+
 
 if __name__ == "__main__":
     main()

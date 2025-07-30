@@ -16,4 +16,4 @@ RUN uv pip install -e .
 EXPOSE 8000
 
 # Start the MCP server with streamable-http transport (default host/port)
-CMD ["uv", "run", "-m", "ticktick_mcp.cli", "run", "--transport", "streamable-http"]
+CMD ["uv", "run", "-m", "ticktick_mcp.cli", "run", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8000"]
