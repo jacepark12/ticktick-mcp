@@ -110,11 +110,32 @@ def format_project(project: Dict) -> str:
     
     return formatted
 
-# MCP Tools
+
+@mcp.tool()
+async def get_inbox_tasks() -> str:
+    """Get tasks from the "Inbox" list.
+
+    Returns:
+        str: _description_
+    """
+    if not ticktick:
+        if not initialize_client():
+            return "Failed to initialize TickTick client. Please check your API credentials."
+      
+    try:
+        inbox = await get_project_tasks(project_id="inbox")
+
+        return inbox
+    except Exception as e:
+        logger.error(f"Error in get_inbox_tasks: {e}")
+        return f"Error retrieving inbox tasks: {str(e)}"
 
 @mcp.tool()
 async def get_projects() -> str:
-    """Get all projects from TickTick."""
+    """Get all projects from TickTick.
+
+        Attention: this does not include the "inbox" project. Please call get_inbox_tasks seperately.
+    """
     if not ticktick:
         if not initialize_client():
             return "Failed to initialize TickTick client. Please check your API credentials."
