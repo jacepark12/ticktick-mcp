@@ -131,6 +131,42 @@ The server handles token refresh automatically, so you won't need to reauthentic
 
 Once connected, you'll see the TickTick MCP server tools available in Claude, indicated by the 🔨 (tools) icon.
 
+## Usage with Docker
+
+You can also run the TickTick MCP server in a Docker container for local testing or production deployment:
+
+1. **Build the Docker image:**
+   ```bash
+   docker build -t ticktick-mcp:latest .
+   ```
+
+2. **Run the container:**
+   ```bash
+   docker run -p 8000:8000 --env TICKTICK_CLIENT_ID --env TICKTICK_CLIENT_SECRET --env TICKTICK_ACCESS_TOKEN ticktick-mcp:latest
+   ```
+   - This will start the server on port 8000 using the streamable HTTP transport.
+   - You can also use `--env-file .env` if you have your credentials in a file.
+
+3. **Use the server:**
+   - Send requests to: `http://localhost:8000/`
+   - The MCP endpoints will be available for integration with Claude, n8n, or other MCP clients.
+
+## Deploy locally from source
+
+### Option A: Run as stdio server
+
+```bash
+uv run -m ticktick_mcp.cli run --transport stdio
+```
+This will start the server using the stdio transport, which is suitable for local tools and integrations like Claude Desktop.
+
+### Option B: Run as HTTP server
+
+```bash
+uv run -m ticktick_mcp.cli run --transport streamable-http
+```
+This will start the server using the streamable HTTP transport on the default host and port (`http://localhost:8000/`).
+
 ## Available MCP Tools
 
 | Tool | Description | Parameters |

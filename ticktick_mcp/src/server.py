@@ -981,15 +981,15 @@ async def create_subtask(
         logger.error(f"Error in create_subtask: {e}")
         return f"Error creating subtask: {str(e)}"
 
-def main():
+def main(transport='stdio'):
     """Main entry point for the MCP server."""
     # Initialize the TickTick client
     if not initialize_client():
         logger.error("Failed to initialize TickTick client. Please check your API credentials.")
         return
-    
-    # Run the server
-    mcp.run(transport='stdio')
+
+    # Run the server with the selected transport
+    mcp.run(transport=transport)
 
 if __name__ == "__main__":
     main()

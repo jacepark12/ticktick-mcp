@@ -32,10 +32,10 @@ def main():
         help="Enable debug logging"
     )
     run_parser.add_argument(
-        "--transport", 
-        default="stdio", 
-        choices=["stdio"], 
-        help="Transport type (currently only stdio is supported)"
+        "--transport",
+        default="stdio",
+        choices=["stdio", "streamable-http"],
+        help="Transport type: 'stdio' (default) or 'streamable-http' for HTTP server"
     )
     
     # 'auth' command for authentication
@@ -83,10 +83,8 @@ Run 'uv run -m ticktick_mcp.cli auth' to set up authentication later.
             level=log_level,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
-        
-        # Start the server
         try:
-            server_main()
+            server_main(transport=args.transport)
         except KeyboardInterrupt:
             print("Server stopped by user", file=sys.stderr)
             sys.exit(0)
