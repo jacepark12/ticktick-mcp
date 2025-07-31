@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/jacepark12-ticktick-mcp-badge.png)](https://mseep.ai/app/jacepark12-ticktick-mcp)
+
 # TickTick MCP Server
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for TickTick that enables interacting with your TickTick task management system directly through Claude and other MCP clients.
