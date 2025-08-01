@@ -133,25 +133,83 @@ Once connected, you'll see the TickTick MCP server tools available in Claude, in
 
 ## Usage with Docker
 
-You can also run the TickTick MCP server in a Docker container for local testing or production deployment:
+The TickTick MCP server can be run in a Docker container, providing a clean, isolated environment for deployment. Docker support includes two main modes: 
+1. an interactive authentication mode for initial setup and 
+2. a production mode for deployments with pre-configured tokens.
 
-1. **Build the Docker image:**
+### Option 1: Authorize with Docker
+
+For when authenticating with TickTick using Docker.
+
+#### Requirements for Docker Authentication
+
+- **Web browser access**: You'll need to open a browser to complete the OAuth flow
+- **Port 8000 available**: The OAuth callback server needs port 8000 to be free on your host
+
+**Note**: This interactive authentication mode is designed for local development. For production deployments, use the pre-configured tokens approach instead.
+
+#### Authentication Steps
+
+1. **Set up your .env file**:
+   ```
+   TICKTICK_CLIENT_ID=your_client_id_here
+   TICKTICK_CLIENT_SECRET=your_client_secret_here
+   ```
+
+2. **Build the Docker image:**
    ```bash
    docker build -t ticktick-mcp:latest .
    ```
 
-2. **Run the container:**
+3. **Run the authentication:**
    ```bash
-   docker run -p 8000:8000 --env TICKTICK_CLIENT_ID --env TICKTICK_CLIENT_SECRET --env TICKTICK_ACCESS_TOKEN ticktick-mcp:latest
+   docker run -p 8000:8000 -it -v $(pwd)/.env:/app/.env ticktick-mcp:latest run-with-auth
    ```
-   - This will start the server on port 8000 using the streamable HTTP transport.
-   - You can also use `--env-file .env` if you have your credentials in a file.
 
-3. **Use the server:**
-   - Send requests to: `http://localhost:8000/`
-   - The MCP endpoints will be available for integration with Claude, n8n, or other MCP clients.
+The container will:
+- Start authentication and display a TickTick OAuth URL
+- Wait for you to open the URL in your browser and authorize
+- Automatically receive the OAuth callback via port mapping
+- Save the access token in the persisted .env file
+- Start the MCP server on `http://localhost:8000` to validate the connection
 
-## Deploy locally from source
+4. **Verify .env variables:**
+   Once authentication is complete, your `.env` file will contain:
+   ```
+   TICKTICK_CLIENT_ID=your_client_id
+   TICKTICK_CLIENT_SECRET=your_client_secret
+   TICKTICK_ACCESS_TOKEN=generated_access_token
+   TICKTICK_REFRESH_TOKEN=generated_refresh_token (if applicable)
+   ```
+
+### Option 2: Pre-configured Tokens (Production)
+
+For production deployments where you already have access tokens:
+
+1. **Set up your .env file**:
+   ```
+   TICKTICK_CLIENT_ID=your_client_id_here
+   TICKTICK_CLIENT_SECRET=your_client_secret_here
+   TICKTICK_CLIENT_ACCESS_TOKEN=your_access_token_here
+   ```
+
+2. **Build the Docker image:**
+   ```bash
+   docker build -t ticktick-mcp:latest .
+   ```
+
+2. **Run the server directly:**
+   ```bash
+   docker run -p 8000:8000 ticktick-mcp:latest
+   ```
+
+This mode skips authentication and directly starts the server, suitable for:
+- Production deployments
+- Remote containers (Azure Container Apps, AWS ECS, etc.)
+- CI/CD environments
+- Any scenario where you already have valid OAuth tokens
+
+## Deploy Server locally from source
 
 ### Option A: Run as stdio server
 

@@ -15,6 +15,7 @@ import http.server
 import socketserver
 import urllib.parse
 import requests
+import threading
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Any
 from dotenv import load_dotenv
@@ -25,6 +26,10 @@ logger = logging.getLogger(__name__)
 
 # Default scopes for TickTick API
 DEFAULT_SCOPES = ["tasks:read", "tasks:write"]
+
+def is_running_in_docker():
+    """Check if we're running inside a Docker container."""
+    return os.path.exists('/.dockerenv')
 
 class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
     """Handle OAuth callback requests."""
@@ -207,6 +212,14 @@ class TickTickAuth:
         if not self.client_id or not self.client_secret:
             return "TickTick client ID or client secret is missing. Please set up your credentials first."
         
+        # Check if we're running in Docker
+        if is_running_in_docker():
+            return self._docker_auth_flow(scopes)
+        else:
+            return self._browser_auth_flow(scopes)
+    
+    def _browser_auth_flow(self, scopes: list = None) -> str:
+        """Traditional OAuth flow with browser (for host environment)."""
         # Generate a random state parameter for CSRF protection
         state = base64.urlsafe_b64encode(os.urandom(30)).decode('utf-8')
         
@@ -256,6 +269,59 @@ class TickTickAuth:
             # Clean up the server
             if httpd:
                 httpd.server_close()
+    
+    def _docker_auth_flow(self, scopes: list = None) -> str:
+        """Container-friendly OAuth flow."""        
+        try:
+            # Use SO_REUSEADDR to allow port reuse
+            class ReusableTCPServer(socketserver.TCPServer):
+                allow_reuse_address = True
+            
+            with ReusableTCPServer(("", self.port), OAuthCallbackHandler) as httpd:
+                OAuthCallbackHandler.auth_code = None
+                
+                server_thread = threading.Thread(target=httpd.serve_forever)
+                server_thread.daemon = True
+                server_thread.start()
+                
+                # Generate authorization URL with container callback
+                auth_url = self.get_authorization_url(scopes)
+                
+                print("=" * 60)
+                print("🐳 Docker container detected!")
+                print(f"📱 Please open this URL in your browser:")
+                print(f"   {auth_url}")
+                print(f"🔗 Make sure port {self.port} is forwarded:")
+                print(f"   docker run -p {self.port}:{self.port} your-image")
+                print("=" * 60)
+                
+                # Wait for callback with timeout
+                timeout = 300  # 5 minutes
+                start_time = time.time()
+                
+                while OAuthCallbackHandler.auth_code is None:
+                    if time.time() - start_time > timeout:
+                        httpd.shutdown()
+                        server_thread.join(timeout=2)
+                        return "OAuth timeout - no response received after 5 minutes"
+                    time.sleep(1)
+                
+                # Store the auth code
+                self.auth_code = OAuthCallbackHandler.auth_code
+                
+                # Properly shutdown the server
+                httpd.shutdown()
+                server_thread.join(timeout=2)
+                
+                # Give the socket time to be released
+                time.sleep(1)
+                
+                # Exchange the code for tokens
+                return self.exchange_code_for_token()
+                
+        except Exception as e:
+            logger.error(f"Error during Docker OAuth flow: {e}")
+            return f"Error during Docker OAuth flow: {str(e)}"
     
     def exchange_code_for_token(self) -> str:
         """
