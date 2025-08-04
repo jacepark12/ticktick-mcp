@@ -156,14 +156,57 @@ For when authenticating with TickTick using Docker.
    TICKTICK_CLIENT_SECRET=your_client_secret_here
    ```
 
-2. **Build the Docker image:**
+2. **Get the Docker image** (choose one option):
+
+   **Option A: Pull from GitHub Container Registry (Recommended):**
+   ```bash
+   docker pull ghcr.io/jacepark12/ticktick-mcp:latest
+   ```
+
+   **Option B: Build locally:**
+   First clone the repository if you haven't already
+   ```bash
+   git clone https://github.com/jacepark12/ticktick-mcp.git
+   cd ticktick-mcp
+   ```
+   Then build the image
    ```bash
    docker build -t ticktick-mcp:latest .
    ```
 
 3. **Run the authentication:**
+
+   **If you pulled from GHCR:**
    ```bash
+   docker run -p 8000:8000 -it ghcr.io/jacepark12/ticktick-mcp:latest run-with-auth
+   ```
+
+   **If you built locally:**
+   ```bash
+   docker run -p 8000:8000 -it ticktick-mcp:latest run-with-auth
+   ```
+
+   **Additional options:**
+
+   **Option A: Persistent `.env` file (recommended for saving tokens across runs):**
+   ```bash
+   # With GHCR image
+   docker run -p 8000:8000 -it -v $(pwd)/.env:/app/.env ghcr.io/jacepark12/ticktick-mcp:latest run-with-auth
+   
+   # With local image
    docker run -p 8000:8000 -it -v $(pwd)/.env:/app/.env ticktick-mcp:latest run-with-auth
+   ```
+
+   **Option B: Using environment variables directly:**
+   ```bash
+   # Using -e flags
+   docker run -p 8000:8000 -it \
+     -e TICKTICK_CLIENT_ID="your_client_id" \
+     -e TICKTICK_CLIENT_SECRET="your_client_secret" \
+     ghcr.io/jacepark12/ticktick-mcp:latest run-with-auth
+   
+   # Using --env-file
+   docker run -p 8000:8000 -it --env-file .env ghcr.io/jacepark12/ticktick-mcp:latest run-with-auth
    ```
 
 The container will:
@@ -172,6 +215,8 @@ The container will:
 - Automatically receive the OAuth callback via port mapping
 - Save the access token in the persisted .env file
 - Start the MCP server on `http://localhost:8000` to validate the connection
+
+
 
 4. **Verify .env variables:**
    Once authentication is complete, your `.env` file will contain:
@@ -190,17 +235,38 @@ For production deployments where you already have access tokens:
    ```
    TICKTICK_CLIENT_ID=your_client_id_here
    TICKTICK_CLIENT_SECRET=your_client_secret_here
-   TICKTICK_CLIENT_ACCESS_TOKEN=your_access_token_here
+   TICKTICK_ACCESS_TOKEN=your_access_token_here
+   ```
+   
+   **Note**: You can skip creating this file and provide environment variables directly in step 3 using `-e [ENV_VAR]` flags instead.
+
+2. **Get the Docker image** (choose one option):
+
+   **Option A: Pull from GitHub Container Registry (Recommended):**
+   ```bash
+   docker pull ghcr.io/jacepark12/ticktick-mcp:latest
    ```
 
-2. **Build the Docker image:**
+   **Option B: Build locally:**
    ```bash
+   # First clone the repository if you haven't already
+   git clone https://github.com/jacepark12/ticktick-mcp.git
+   cd ticktick-mcp
+   
+   # Then build the image
    docker build -t ticktick-mcp:latest .
    ```
 
-2. **Run the server directly:**
+3. **Run the server directly:**
+
+   **If you pulled from GHCR:**
    ```bash
-   docker run -p 8000:8000 ticktick-mcp:latest
+   docker run -p 8000:8000 --env-file .env ghcr.io/jacepark12/ticktick-mcp:latest 
+   ```
+
+   **If you built locally:**
+   ```bash
+   docker run -p 8000:8000 --env-file .env ticktick-mcp:latest
    ```
 
 This mode skips authentication and directly starts the server, suitable for:
