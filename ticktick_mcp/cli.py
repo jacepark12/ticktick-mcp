@@ -32,12 +32,23 @@ def main():
         help="Enable debug logging"
     )
     run_parser.add_argument(
-        "--transport", 
-        default="stdio", 
-        choices=["stdio"], 
-        help="Transport type (currently only stdio is supported)"
+        "--transport",
+        default="stdio",
+        choices=["stdio", "streamable-http"],
+        help="Transport type: 'stdio' (default) or 'streamable-http' for HTTP server"
     )
-    
+    run_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind the http server to"
+    )
+    run_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to bind the http server to"
+    )
+
     # 'auth' command for authentication
     auth_parser = subparsers.add_parser("auth", help="Authenticate with TickTick")
     
@@ -83,10 +94,8 @@ Run 'uv run -m ticktick_mcp.cli auth' to set up authentication later.
             level=log_level,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
-        
-        # Start the server
         try:
-            server_main()
+            server_main(transport=args.transport, host=args.host, port=args.port)
         except KeyboardInterrupt:
             print("Server stopped by user", file=sys.stderr)
             sys.exit(0)
