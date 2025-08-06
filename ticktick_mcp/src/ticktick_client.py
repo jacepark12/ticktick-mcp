@@ -193,6 +193,45 @@ class TickTickClient:
         """Gets project with tasks and columns."""
         return self._make_request("GET", f"/project/{project_id}/data")
     
+    def get_project_root_tasks_sort_order(self, project_id: str) -> int:
+        """Gets the next available sort order for root tasks in a project."""
+        project_data = self.get_project_with_data(project_id)
+        if 'error' in project_data:
+            return 10000  # Default starting sort order - use larger value to avoid conflicts
+        
+        tasks = project_data.get('tasks', [])
+        if not tasks:
+            return 10000
+        
+        # Find maximum sortOrder among root tasks (those without parentId)
+        root_tasks = [task for task in tasks if not task.get('parentId')]
+        if root_tasks:
+            logger.info(f"Found {len(root_tasks)} root tasks in project {project_id}")
+            # Get all sort orders and filter out None/invalid values
+            valid_sort_orders = []
+            for task in root_tasks:
+                sort_order = task.get('sortOrder')
+                logger.debug(f"Task {task.get('id', 'unknown')} has sortOrder: {sort_order} (type: {type(sort_order)})")
+                if sort_order is not None and isinstance(sort_order, (int, float)):
+                    # Only accept reasonable sort order values (positive and not too large)
+                    if 0 <= sort_order <= 1000000000:  # Reasonable range
+                        valid_sort_orders.append(int(sort_order))
+                    else:
+                        logger.warning(f"Task {task.get('id')} has unreasonable sortOrder: {sort_order}")
+            
+            if valid_sort_orders:
+                max_sort_order = max(valid_sort_orders)
+                next_sort_order = max_sort_order + 10000  # Larger increment to avoid conflicts
+                logger.info(f"Max existing valid sort order: {max_sort_order}, next will be: {next_sort_order}")
+                return next_sort_order
+            else:
+                # No valid sort orders found, use a safe starting value
+                logger.info("No valid sort orders found, starting with 10000")
+                return 10000
+        else:
+            logger.info("No root tasks found, starting with 10000")
+            return 10000
+    
     def create_project(self, name: str, color: str = "#F18181", view_mode: str = "list", kind: str = "TASK") -> Dict:
         """Creates a new project."""
         data = {
@@ -229,8 +268,8 @@ class TickTickClient:
     
     def create_task(self, title: str, project_id: str, content: str = None, 
                    start_date: str = None, due_date: str = None, 
-                   priority: int = 0, is_all_day: bool = False) -> Dict:
-        """Creates a new task."""
+                   priority: int = 0, is_all_day: bool = False, sort_order: int = None) -> Dict:
+        """Creates a new task with optional sort order for proper positioning."""
         data = {
             "title": title,
             "projectId": project_id
@@ -246,6 +285,8 @@ class TickTickClient:
             data["priority"] = priority
         if is_all_day is not None:
             data["isAllDay"] = is_all_day
+        if sort_order is not None:
+            data["sortOrder"] = sort_order
             
         return self._make_request("POST", "/task", data)
     
@@ -283,6 +324,7 @@ class TickTickClient:
                       content: str = None, priority: int = 0) -> Dict:
         """
         Creates a subtask for a parent task within the same project.
+        Uses tail insertion to maintain order of creation.
         
         Args:
             subtask_title: Title of the subtask
@@ -290,6 +332,59 @@ class TickTickClient:
             project_id: ID of the project (must be same for both parent and subtask)
             content: Optional content/description for the subtask
             priority: Priority level (0-3, where 3 is highest)
+        
+        Returns:
+            API response as a dictionary containing the created subtask
+        """
+        # First, get the parent task to determine the appropriate sortOrder
+        parent_task = self.get_task(project_id, parent_task_id)
+        if 'error' in parent_task:
+            return parent_task
+        
+        # Calculate sortOrder for tail insertion with validation
+        existing_items = parent_task.get('items', [])
+        if existing_items:
+            # Filter out unreasonable sortOrder values
+            valid_sort_orders = [
+                item.get('sortOrder', 0) for item in existing_items 
+                if isinstance(item.get('sortOrder'), (int, float)) and 0 <= item.get('sortOrder', 0) <= 1000000000
+            ]
+            
+            if valid_sort_orders:
+                max_sort_order = max(valid_sort_orders)
+                new_sort_order = max_sort_order + 1000  # Safe increment for tail insertion
+            else:
+                new_sort_order = 1000  # Safe default
+        else:
+            # First subtask, use safe base value
+            new_sort_order = 1000
+        
+        data = {
+            "title": subtask_title,
+            "projectId": project_id,
+            "parentId": parent_task_id,
+            "sortOrder": new_sort_order
+        }
+        
+        if content:
+            data["content"] = content
+        if priority is not None:
+            data["priority"] = priority
+            
+        return self._make_request("POST", "/task", data)
+    
+    def create_subtask_with_order(self, subtask_title: str, parent_task_id: str, project_id: str, 
+                                 content: str = None, priority: int = 0, sort_order: int = None) -> Dict:
+        """
+        Creates a subtask with a specific sort order (more efficient when sort order is pre-calculated).
+        
+        Args:
+            subtask_title: Title of the subtask
+            parent_task_id: ID of the parent task
+            project_id: ID of the project (must be same for both parent and subtask)
+            content: Optional content/description for the subtask
+            priority: Priority level (0-3, where 3 is highest)
+            sort_order: Pre-calculated sort order for this subtask
         
         Returns:
             API response as a dictionary containing the created subtask
@@ -304,5 +399,67 @@ class TickTickClient:
             data["content"] = content
         if priority is not None:
             data["priority"] = priority
+        if sort_order is not None:
+            data["sortOrder"] = sort_order
             
         return self._make_request("POST", "/task", data)
+    
+    def create_subtasks_batch(self, subtasks_data: List[Dict], parent_task_id: str, project_id: str) -> List[Dict]:
+        """
+        Creates multiple subtasks for a parent task with proper ordering.
+        More efficient than individual calls as it only fetches parent task once.
+        
+        Args:
+            subtasks_data: List of subtask dictionaries with 'title', optional 'content', 'priority'
+            parent_task_id: ID of the parent task
+            project_id: ID of the project
+        
+        Returns:
+            List of API responses for each created subtask
+        """
+        # Get the parent task once to determine the starting sortOrder
+        parent_task = self.get_task(project_id, parent_task_id)
+        if 'error' in parent_task:
+            return [parent_task] * len(subtasks_data)
+        
+        # Calculate starting sortOrder for tail insertion with validation
+        existing_items = parent_task.get('items', [])
+        print(f"Found {len(existing_items)} existing subtasks for parent task")
+        
+        if existing_items:
+            # Filter out unreasonable sortOrder values
+            valid_sort_orders = [
+                item.get('sortOrder', 0) for item in existing_items 
+                if isinstance(item.get('sortOrder'), (int, float)) and 0 <= item.get('sortOrder', 0) <= 1000000000
+            ]
+            
+            if valid_sort_orders:
+                max_sort_order = max(valid_sort_orders)
+                base_sort_order = max_sort_order + 1000  # Safe increment
+                print(f"Max existing valid sort order: {max_sort_order}, starting new batch at: {base_sort_order}")
+            else:
+                base_sort_order = 1000  # Safe default
+                print(f"No valid sort orders found, using default base: {base_sort_order}")
+        else:
+            base_sort_order = 1000  # Safe default for first subtask
+            print(f"No existing subtasks, using default base: {base_sort_order}")
+        
+        # Create subtasks with incrementing sortOrder
+        results = []
+        for i, subtask_info in enumerate(subtasks_data):
+            data = {
+                "title": subtask_info['title'],
+                "projectId": project_id,
+                "parentId": parent_task_id,
+                "sortOrder": base_sort_order + (i * 100)  # Space them out by 100
+            }
+            
+            if subtask_info.get('content'):
+                data["content"] = subtask_info['content']
+            if subtask_info.get('priority') is not None:
+                data["priority"] = subtask_info['priority']
+            
+            result = self._make_request("POST", "/task", data)
+            results.append(result)
+        
+        return results

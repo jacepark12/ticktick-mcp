@@ -981,6 +981,407 @@ async def create_subtask(
         logger.error(f"Error in create_subtask: {e}")
         return f"Error creating subtask: {str(e)}"
 
+@mcp.tool()
+async def batch_create_subtasks(
+    parent_task_id: str,
+    project_id: str,
+    subtasks: List[Dict[str, Any]]
+) -> str:
+    """
+    Create multiple subtasks for a specific parent task at once
+    
+    Args:
+        parent_task_id: ID of the parent task
+        project_id: ID of the project (must be same for both parent and subtasks)
+        subtasks: List of subtask dictionaries. Each subtask must contain:
+            - title (required): Subtask Name
+            - content (optional): Subtask description
+            - priority (optional): Priority level {0: "None", 1: "Low", 3: "Medium", 5: "High"}
+    
+    Example:
+        subtasks = [
+            {"title": "Research phase", "priority": 3},
+            {"title": "Implementation", "content": "Code the feature", "priority": 5},
+            {"title": "Testing", "priority": 1}
+        ]
+    """
+    if not ticktick:
+        if not initialize_client():
+            return "Failed to initialize TickTick client. Please check your API credentials."
+    
+    if not subtasks:
+        return "No subtasks provided. Please provide a list of subtasks to create."
+    
+    if not isinstance(subtasks, list):
+        return "Subtasks must be provided as a list of dictionaries."
+    
+    # Validate all subtasks before creating any
+    validation_errors = []
+    for i, subtask_data in enumerate(subtasks):
+        if not isinstance(subtask_data, dict):
+            validation_errors.append(f"Subtask {i + 1}: Must be a dictionary")
+            continue
+        
+        # Check required fields
+        if 'title' not in subtask_data or not subtask_data['title']:
+            validation_errors.append(f"Subtask {i + 1}: 'title' is required and cannot be empty")
+            continue
+        
+        # Validate priority if provided
+        priority = subtask_data.get('priority')
+        if priority is not None and priority not in [0, 1, 3, 5]:
+            validation_errors.append(f"Subtask {i + 1}: Invalid priority {priority}. Must be 0 (None), 1 (Low), 3 (Medium), or 5 (High)")
+    
+    if validation_errors:
+        return "Validation errors found:\n" + "\n".join(validation_errors)
+    
+    # Create subtasks one by one and collect results
+    created_subtasks = []
+    failed_subtasks = []
+    
+    try:
+        for i, subtask_data in enumerate(subtasks):
+            try:
+                # Extract subtask parameters with defaults
+                title = subtask_data['title']
+                content = subtask_data.get('content')
+                priority = subtask_data.get('priority', 0)
+                
+                # Create the subtask
+                result = ticktick.create_subtask(
+                    subtask_title=title,
+                    parent_task_id=parent_task_id,
+                    project_id=project_id,
+                    content=content,
+                    priority=priority
+                )
+                
+                if 'error' in result:
+                    failed_subtasks.append(f"Subtask {i + 1} ('{title}'): {result['error']}")
+                else:
+                    created_subtasks.append((i + 1, title, result))
+                    
+            except Exception as e:
+                failed_subtasks.append(f"Subtask {i + 1} ('{subtask_data.get('title', 'Unknown')}'): {str(e)}")
+        
+        # Format the results
+        result_message = f"Batch subtask creation completed.\n\n"
+        result_message += f"Successfully created: {len(created_subtasks)} subtasks\n"
+        result_message += f"Failed: {len(failed_subtasks)} subtasks\n\n"
+        
+        if created_subtasks:
+            result_message += "✅ Successfully Created Subtasks:\n"
+            for subtask_num, title, subtask_obj in created_subtasks:
+                result_message += f"{subtask_num}. {title} (ID: {subtask_obj.get('id', 'Unknown')})\n"
+            result_message += "\n"
+        
+        if failed_subtasks:
+            result_message += "❌ Failed Subtasks:\n"
+            for error in failed_subtasks:
+                result_message += f"{error}\n"
+        
+        return result_message
+        
+    except Exception as e:
+        logger.error(f"Error in batch_create_subtasks: {e}")
+        return f"Error during batch subtask creation: {str(e)}"
+
+def _validate_hierarchical_task(task_data: Dict[str, Any], task_path: str = "root") -> List[str]:
+    """
+    Recursively validate a hierarchical task structure.
+    
+    Args:
+        task_data: Task dictionary to validate
+        task_path: Current path in the hierarchy for error reporting
+    
+    Returns:
+        List of validation error messages
+    """
+    errors = []
+    
+    # Validate current task
+    if not isinstance(task_data, dict):
+        errors.append(f"{task_path}: Must be a dictionary")
+        return errors
+    
+    # Check required fields
+    if 'title' not in task_data or not task_data['title']:
+        errors.append(f"{task_path}: 'title' is required and cannot be empty")
+    
+    # Validate priority if provided
+    priority = task_data.get('priority')
+    if priority is not None and priority not in [0, 1, 3, 5]:
+        errors.append(f"{task_path}: Invalid priority {priority}. Must be 0 (None), 1 (Low), 3 (Medium), or 5 (High)")
+    
+    # Validate dates if provided
+    for date_field in ['start_date', 'due_date']:
+        date_str = task_data.get(date_field)
+        if date_str:
+            try:
+                # Try to parse the date to validate it
+                if date_str.endswith('Z'):
+                    datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                elif '+' in date_str or date_str.endswith(('00', '30')):
+                    datetime.fromisoformat(date_str)
+                else:
+                    datetime.fromisoformat(date_str)
+            except ValueError:
+                errors.append(f"{task_path}: Invalid {date_field} format '{date_str}'. Use ISO format: YYYY-MM-DDTHH:mm:ss or with timezone")
+    
+    # Recursively validate subtasks
+    subtasks = task_data.get('subtasks', [])
+    if subtasks:
+        if not isinstance(subtasks, list):
+            errors.append(f"{task_path}: 'subtasks' must be a list")
+        else:
+            for i, subtask in enumerate(subtasks):
+                subtask_path = f"{task_path}.subtask[{i+1}]"
+                errors.extend(_validate_hierarchical_task(subtask, subtask_path))
+    
+    return errors
+
+def _create_task_recursive(
+    task_data: Dict[str, Any], 
+    project_id: str, 
+    parent_task_id: Optional[str] = None,
+    task_path: str = "root",
+    sort_order: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Recursively create a task and its subtasks with proper ordering.
+    
+    Args:
+        task_data: Task dictionary containing task info and optional subtasks
+        project_id: ID of the project
+        parent_task_id: ID of parent task (None for root tasks)
+        task_path: Current path in hierarchy for error reporting
+        sort_order: Sort order for this task (calculated by caller)
+    
+    Returns:
+        Dictionary with creation results including success/failure info and created task details
+    """
+    result = {
+        'path': task_path,
+        'title': task_data.get('title', 'Unknown'),
+        'success': False,
+        'task_id': None,
+        'error': None,
+        'subtasks': [],
+        'sort_order': sort_order
+    }
+    
+    try:
+        # Extract task parameters
+        title = task_data['title']
+        content = task_data.get('content')
+        start_date = task_data.get('start_date')
+        due_date = task_data.get('due_date')
+        priority = task_data.get('priority', 0)
+        
+        # Create the task or subtask
+        if parent_task_id is None:
+            # Create root task with calculated sort order
+            created_task = ticktick.create_task(
+                title=title,
+                project_id=project_id,
+                content=content,
+                start_date=start_date,
+                due_date=due_date,
+                priority=priority,
+                sort_order=sort_order
+            )
+        else:
+            # Create subtask with calculated sort order
+            # We'll modify create_subtask to accept sort_order parameter
+            created_task = ticktick.create_subtask_with_order(
+                subtask_title=title,
+                parent_task_id=parent_task_id,
+                project_id=project_id,
+                content=content,
+                priority=priority,
+                sort_order=sort_order
+            )
+        
+        if 'error' in created_task:
+            result['error'] = created_task['error']
+            return result
+        
+        # Mark as successful and store task ID
+        result['success'] = True
+        result['task_id'] = created_task.get('id')
+        result['created_task'] = created_task
+        
+        # Process subtasks recursively with calculated sort orders
+        subtasks = task_data.get('subtasks', [])
+        if subtasks:
+            # Calculate sort orders for all subtasks at this level
+            base_sort_order = 10000  # Start with a safe base value
+            for i, subtask_data in enumerate(subtasks):
+                subtask_path = f"{task_path}.subtask[{i+1}]"
+                subtask_sort_order = base_sort_order + (i * 1000)  # Space subtasks by 1000
+                
+                subtask_result = _create_task_recursive(
+                    subtask_data, 
+                    project_id, 
+                    result['task_id'],
+                    subtask_path,
+                    subtask_sort_order
+                )
+                result['subtasks'].append(subtask_result)
+        
+    except Exception as e:
+        result['error'] = str(e)
+        logger.error(f"Error creating task at {task_path}: {e}")
+    
+    return result
+
+def _format_creation_results(results: List[Dict[str, Any]], level: int = 0) -> str:
+    """
+    Format the hierarchical creation results into a readable string.
+    
+    Args:
+        results: List of creation result dictionaries
+        level: Current indentation level
+    
+    Returns:
+        Formatted string representation of the results
+    """
+    output = ""
+    indent = "  " * level
+    
+    for result in results:
+        status = "✅" if result['success'] else "❌"
+        title = result['title']
+        task_id = result.get('task_id', 'Unknown')
+        sort_order = result.get('sort_order', 'N/A')
+        
+        if result['success']:
+            output += f"{indent}{status} {title} (ID: {task_id}, Sort: {sort_order})\n"
+        else:
+            error = result.get('error', 'Unknown error')
+            output += f"{indent}{status} {title} - Error: {error} (Sort: {sort_order})\n"
+        
+        # Recursively format subtask results
+        if result['subtasks']:
+            output += _format_creation_results(result['subtasks'], level + 1)
+    
+    return output
+
+@mcp.tool()
+async def create_task_hierarchy(
+    project_id: str,
+    tasks: List[Dict[str, Any]]
+) -> str:
+    """
+    Create a hierarchical task structure with nested subtasks in a single operation.
+    This tool processes the entire hierarchy on the server side, handling task ID dependencies automatically.
+    
+    Args:
+        project_id: ID of the project where tasks will be created
+        tasks: List of task dictionaries with nested subtask structure. Each task can contain:
+            - title (required): Task name
+            - content (optional): Task description
+            - start_date (optional): Start date in ISO format (YYYY-MM-DDTHH:mm:ss or with timezone)
+            - due_date (optional): Due date in ISO format (YYYY-MM-DDTHH:mm:ss or with timezone)
+            - priority (optional): Priority level {0: "None", 1: "Low", 3: "Medium", 5: "High"}
+            - subtasks (optional): List of subtask dictionaries with the same structure (max 5 levels deep)
+    
+    Example:
+        tasks = [
+            {
+                "title": "Plan new feature",
+                "priority": 5,
+                "subtasks": [
+                    {"title": "Initial research"},
+                    {
+                        "title": "Draft specification", 
+                        "priority": 3,
+                        "subtasks": [
+                            {"title": "Define API endpoints"},
+                            {"title": "Create mockups"}
+                        ]
+                    }
+                ]
+            },
+            {
+                "title": "Another root task",
+                "content": "This task has no subtasks"
+            }
+        ]
+    """
+    if not ticktick:
+        if not initialize_client():
+            return "Failed to initialize TickTick client. Please check your API credentials."
+    
+    if not tasks:
+        return "No tasks provided. Please provide a list of tasks to create."
+    
+    if not isinstance(tasks, list):
+        return "Tasks must be provided as a list of dictionaries."
+    
+    # Validate the entire hierarchy before creating anything
+    validation_errors = []
+    for i, task_data in enumerate(tasks):
+        task_path = f"task[{i+1}]"
+        errors = _validate_hierarchical_task(task_data, task_path)
+        validation_errors.extend(errors)
+    
+    if validation_errors:
+        return "Validation errors found:\n" + "\n".join(validation_errors)
+    
+    # Create all tasks recursively
+    creation_results = []
+    
+    try:
+        # Calculate sort orders for root tasks
+        base_sort_order = ticktick.get_project_root_tasks_sort_order(project_id)
+        logger.info(f"Base sort order for project {project_id}: {base_sort_order}")
+        
+        for i, task_data in enumerate(tasks):
+            task_path = f"task[{i+1}]"
+            root_sort_order = base_sort_order + (i * 10000)  # Space root tasks by 10000
+            logger.info(f"Creating task {i+1} with sort order: {root_sort_order}")
+            
+            result = _create_task_recursive(
+                task_data, 
+                project_id, 
+                None, 
+                task_path, 
+                root_sort_order
+            )
+            creation_results.append(result)
+        
+        # Count successes and failures
+        def count_results(results):
+            success_count = 0
+            failure_count = 0
+            for result in results:
+                if result['success']:
+                    success_count += 1
+                else:
+                    failure_count += 1
+                # Recursively count subtasks
+                sub_success, sub_failure = count_results(result['subtasks'])
+                success_count += sub_success
+                failure_count += sub_failure
+            return success_count, failure_count
+        
+        success_count, failure_count = count_results(creation_results)
+        
+        # Format the results
+        result_message = f"Hierarchical task creation completed.\n\n"
+        result_message += f"Successfully created: {success_count} tasks/subtasks\n"
+        result_message += f"Failed: {failure_count} tasks/subtasks\n\n"
+        
+        result_message += "Creation Results:\n"
+        result_message += _format_creation_results(creation_results)
+        
+        return result_message
+        
+    except Exception as e:
+        logger.error(f"Error in create_task_hierarchy: {e}")
+        return f"Error during hierarchical task creation: {str(e)}"
+
 def main():
     """Main entry point for the MCP server."""
     # Initialize the TickTick client
