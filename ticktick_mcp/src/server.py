@@ -1144,16 +1144,18 @@ def _create_task_recursive(
     task_data: Dict[str, Any], 
     project_id: str, 
     parent_task_id: Optional[str] = None,
-    task_path: str = "root"
+    task_path: str = "root",
+    sort_order: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    Recursively create a task and its subtasks.
+    Recursively create a task and its subtasks with proper ordering.
     
     Args:
         task_data: Task dictionary containing task info and optional subtasks
         project_id: ID of the project
         parent_task_id: ID of parent task (None for root tasks)
         task_path: Current path in hierarchy for error reporting
+        sort_order: Sort order for this task (calculated by caller)
     
     Returns:
         Dictionary with creation results including success/failure info and created task details
@@ -1164,7 +1166,8 @@ def _create_task_recursive(
         'success': False,
         'task_id': None,
         'error': None,
-        'subtasks': []
+        'subtasks': [],
+        'sort_order': sort_order
     }
     
     try:
@@ -1177,23 +1180,26 @@ def _create_task_recursive(
         
         # Create the task or subtask
         if parent_task_id is None:
-            # Create root task
+            # Create root task with calculated sort order
             created_task = ticktick.create_task(
                 title=title,
                 project_id=project_id,
                 content=content,
                 start_date=start_date,
                 due_date=due_date,
-                priority=priority
+                priority=priority,
+                sort_order=sort_order
             )
         else:
-            # Create subtask
-            created_task = ticktick.create_subtask(
+            # Create subtask with calculated sort order
+            # We'll modify create_subtask to accept sort_order parameter
+            created_task = ticktick.create_subtask_with_order(
                 subtask_title=title,
                 parent_task_id=parent_task_id,
                 project_id=project_id,
                 content=content,
-                priority=priority
+                priority=priority,
+                sort_order=sort_order
             )
         
         if 'error' in created_task:
@@ -1205,17 +1211,23 @@ def _create_task_recursive(
         result['task_id'] = created_task.get('id')
         result['created_task'] = created_task
         
-        # Process subtasks recursively
+        # Process subtasks recursively with calculated sort orders
         subtasks = task_data.get('subtasks', [])
-        for i, subtask_data in enumerate(subtasks):
-            subtask_path = f"{task_path}.subtask[{i+1}]"
-            subtask_result = _create_task_recursive(
-                subtask_data, 
-                project_id, 
-                result['task_id'],
-                subtask_path
-            )
-            result['subtasks'].append(subtask_result)
+        if subtasks:
+            # Calculate sort orders for all subtasks at this level
+            base_sort_order = 10000  # Start with a safe base value
+            for i, subtask_data in enumerate(subtasks):
+                subtask_path = f"{task_path}.subtask[{i+1}]"
+                subtask_sort_order = base_sort_order + (i * 1000)  # Space subtasks by 1000
+                
+                subtask_result = _create_task_recursive(
+                    subtask_data, 
+                    project_id, 
+                    result['task_id'],
+                    subtask_path,
+                    subtask_sort_order
+                )
+                result['subtasks'].append(subtask_result)
         
     except Exception as e:
         result['error'] = str(e)
@@ -1241,12 +1253,13 @@ def _format_creation_results(results: List[Dict[str, Any]], level: int = 0) -> s
         status = "✅" if result['success'] else "❌"
         title = result['title']
         task_id = result.get('task_id', 'Unknown')
+        sort_order = result.get('sort_order', 'N/A')
         
         if result['success']:
-            output += f"{indent}{status} {title} (ID: {task_id})\n"
+            output += f"{indent}{status} {title} (ID: {task_id}, Sort: {sort_order})\n"
         else:
             error = result.get('error', 'Unknown error')
-            output += f"{indent}{status} {title} - Error: {error}\n"
+            output += f"{indent}{status} {title} - Error: {error} (Sort: {sort_order})\n"
         
         # Recursively format subtask results
         if result['subtasks']:
@@ -1320,9 +1333,22 @@ async def create_task_hierarchy(
     creation_results = []
     
     try:
+        # Calculate sort orders for root tasks
+        base_sort_order = ticktick.get_project_root_tasks_sort_order(project_id)
+        logger.info(f"Base sort order for project {project_id}: {base_sort_order}")
+        
         for i, task_data in enumerate(tasks):
             task_path = f"task[{i+1}]"
-            result = _create_task_recursive(task_data, project_id, None, task_path)
+            root_sort_order = base_sort_order + (i * 10000)  # Space root tasks by 10000
+            logger.info(f"Creating task {i+1} with sort order: {root_sort_order}")
+            
+            result = _create_task_recursive(
+                task_data, 
+                project_id, 
+                None, 
+                task_path, 
+                root_sort_order
+            )
             creation_results.append(result)
         
         # Count successes and failures
